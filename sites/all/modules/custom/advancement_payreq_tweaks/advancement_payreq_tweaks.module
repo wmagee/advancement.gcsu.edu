@@ -18,39 +18,61 @@ function advancement_payreq_tweaks_menu() {
 * Used to resubmit a payment request after it has been declined
 */
 function resubmit_payreq() {
-
-	// create a new payment-request on resubmit
 	$nid = arg(1);
-
-	drupal_goto('node/add/payment-request/' . $nid);
-	return;
-	
-
-	// $new_node = new StdClass();
-	// $old_node = node_load($nid);
-	// $new_node = $old_node;
+	$new_node = new StdClass();
+	$old_node = node_load($nid);
+	$new_node = $old_node;
 	//$str = "<pre>".print_r($old_node, true)."</pre>";
 	//drupal_set_message('BEFORE: '.$str, 'status', true);	
 	
 	//unset fields and resave it as a new node
 	//node info
 	$new_node->nid = null;
-	// unset($new_node->vid);
+	unset($new_node->vid);
 	//unset($new_node->created);
 	//unset($new_node->changed);
 	//unset($new_node->revision_timestamp);
 	//unset($new_node->revision_uid);
 	//unset($new_node->rdf_mapping);
 	
+	//declined
+	unset($new_node->field_declined);
+	unset($new_node->field_payreq_status);
+	
+	//approval fields
+	unset($new_node->field_appr_dept_head);
+	unset($new_node->field_appr_date_dept);
+	
+	unset($new_node->field_adv_rep);
+	unset($new_node->field_appr_adv);
+	unset($new_node->field_appr_date_adv);
+	
+	unset($new_node->field_treasurer);
+	unset($new_node->field_appr_treasurer);
+	unset($new_node->field_appr_date_treas);
+	
+	unset($new_node->field_as_director);
+	unset($new_node->field_appr_director);
+	unset($new_node->field_appr_date_director);
+	
+	unset($new_node->field_vp);
+	unset($new_node->field_appr_vp);
+	unset($new_node->field_appr_date_vp);
+
+	global $user;
+	$new_node->log = "Resubmitted ".date('m/j/Y H:i:s').' by '.$user->name;
+	$new_node->field_log['und'][0]['value'] = "This form was previously declined. It was resubmitted on "
+										.date('m/j/Y H:i:s').' by '.$user->name.
+										". The ID of the previously declined form is: ".$nid;
 	
 	//$str = "<pre>".print_r($new_node, true)."</pre>";
 	//drupal_set_message('AFTER: '.$str, 'status', true);
 	$new_node = node_submit($new_node);
-	// if ($new_node->validated) {
-	// 	node_save($new_node);
-	// }
+	if ($new_node->validated) {
+		node_save($new_node);
+	}
 
-	// drupal_goto("node/".$new_node->nid."/edit");
+	drupal_goto("node/".$new_node->nid."/edit");
 
 }
 /*
@@ -60,25 +82,18 @@ function resubmit_payreq() {
 */
 function advancement_payreq_tweaks_form_payment_request_node_form_alter(&$form, &$form_state, $form_id) {
     
-	// $str = "<pre>".print_r($form, true)."</pre>";
-	// drupal_set_message($str, 'status', true);
-    // global $user; //currently logged in user
+	//$str = "<pre>".print_r($form['nid'], true)."</pre>";
+	//drupal_set_message($str, 'status', true);
+    //global $user; //currently logged in user
 		
-	// if form is declined, hide approvals group
-	if(isset($form['field_declined']['und'][0]['value']['#default_value'])) {
-		field_group_hide_field_groups($form, array('group_payreq_approval','group_dept_approval','group_treas_approval',
-		'group_director','group_adv_approval','group_accountant','group_adv_vp'));
-		drupal_set_message("This Payment Request can no longer be approved because it has been declined.", 'error', true);
-	}
+		//if form is declined, hide approvals group
+		if(isset($form['field_declined']['und'][0]['value']['#default_value'])) {
+			field_group_hide_field_groups($form, array('group_payreq_approval','group_dept_approval','group_treas_approval',
+			'group_director','group_adv_approval','group_accountant','group_adv_vp'));
+			drupal_set_message("This Payment Request can no longer be approved because it has been declined.", 'error', true);
+		}
 		
-	// pre-populate form from node 
-	$nid = arg(3);
-	if(isset($nid)) {
-		$old_node = node_load($nid);
-		$form = _prepopulate_form_from_node ($old_node, $form);	       
-	}
-
-	//if form is being approved by someone other than Treasurer, Accountant, Director, or Admin, hide payreq info and treasurer field groups
+		//if form is being approved by someone other than Treasurer, Accountant, Director, or Admin, hide payreq info and treasurer field groups
 	/*	if (!in_array('Accountant', $user->roles)||!in_array('Treasurer', $user->roles)||
 			!in_array('AS Director', $user->roles)||!in_array('Advancement Admin', $user->roles)||
 			!in_array('drupal_admin', $user->roles)) {
@@ -87,53 +102,6 @@ function advancement_payreq_tweaks_form_payment_request_node_form_alter(&$form, 
 		}
 	*/
 }
-
-/*
- * pre-populate the form with previous form data
- */
-function _prepopulate_form_from_node ($old_node, $form) {
-	
-	foreach($old_node as $fieldName => $value) {
-	    //print 'Fieldname: ' . $fieldName .  'Value: ' . $value['und'][0]['value'] . '<br />';
-
-		//$str = "<pre>".print_r($form['field_payable_to'], true)."</pre>";
-		//drupal_set_message($str, 'status', true);
-
-		$nodeValue = isset($value['und'][0]['value']) ? $value['und'][0]['value'] : null;
-
-	    if(isset($form[$fieldName]['und'][0]['#addressfield']) && $form[$fieldName]['und'][0]['#addressfield']) {
-	        foreach($value['und'][0] as $addressFieldName => $addressvalue) {
-	            $form[$fieldName]['und'][0]['#address'][$addressFieldName] = $addressvalue;
-	        }
-	    } else if(isset($form[$fieldName]['und']['#type']) && $form[$fieldName]['und']['#type'] == 'radios') {
-	        $form[$fieldName]['und']['#default_value'] = $nodeValue; 
-	    } else if(isset($form[$fieldName]['und']['#type']) && $form[$fieldName]['und']['#type'] == 'checkbox') {
-	        $form[$fieldName]['und']['#default_value'] = $nodeValue; 
-	    } else if(isset($form[$fieldName]['und']['#type']) && ($form[$fieldName]['und']['#type'] == 'select' || $form[$fieldName]['und']['#type'] == 'hierarchical_select')) {
-	    	if($form[$fieldName]['und']['#field_name'] == 'field_account' || $form[$fieldName]['und']['#field_name'] == 'field_payable_to') {
-	    	//if(isset($form[$fieldName]['und']['#columns'])) {	
-        		$form[$fieldName]['und']['#default_value'] = $value['und'][0]['tid']; //$nodeValue; 
-       			$str = "<pre>".print_r($form[$fieldName], true)."</pre>";
-    			//drupal_set_message('Name: ' . $fieldName . ' - Value: ' . $str, 'status', true);
-	    	} else {
-        		$form[$fieldName]['und']['#default_value'] = $nodeValue;
-        	} 
- 
-	    } else  if(isset($form[$fieldName]['und'][0]['#type']) && $form[$fieldName]['und'][0]['#type'] == 'select') {
-        	$form[$fieldName]['und']['#default_value'] = $nodeValue; 
-	    } else if(isset($form[$fieldName]['und'][0]['#type']) && $form[$fieldName]['und'][0]['#type'] == 'date_combo') {
-	        $form[$fieldName]['und'][0]['#default_value']['value'] = $nodeValue;    
-	    } else if(isset($form[$fieldName]['und'][0]['#type']) && $form[$fieldName]['und'][0]['#type'] == 'radio') {
-	        $form[$fieldName]['und'][0]['#default_value']['value'] = $nodeValue; 
-	    } 
-	    else if(isset($form[$fieldName]['und'][0]['value'])) {
-	        $form[$fieldName]['und'][0]['value']['#default_value'] = $value['und'][0]['value'];
-	    }
-	}
-
-	return $form;
-}
-
 /*implementation of hook_form_alter
  *if an argument is passed in the url, prepopulate the payment request reference field of the payment request discrepancy form
  *
