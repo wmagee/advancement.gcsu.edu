@@ -1,0 +1,236 @@
+<?php
+
+function solve_hs_issues_menu_alter(&$items) {
+  $items['hierarchical_select_ajax']['page callback'] = 'custom_hierarchical_select_ajax';
+}
+
+function custom_hierarchical_select_ajax($form, $form_state) {
+  $form_parents = func_get_args();
+  $form_build_id = (string) array_pop($form_parents);
+
+  if (empty($_POST['form_build_id']) || $form_build_id != $_POST['form_build_id']) {
+    // Invalid request.
+    drupal_set_message(t('An unrecoverable error occurred.'), 'error');
+    $commands = array();
+    $commands[] = ajax_command_replace(NULL, theme('status_messages'));
+    return array('#type' => 'ajax', '#commands' => $commands);
+  }
+
+  list($form, $form_state) = ajax_get_form();
+
+  if (!$form) {
+    // Invalid form_build_id.
+    drupal_set_message(t('An unrecoverable error occurred. Use of this form has expired. Try reloading the page and submitting again.'), 'error');
+    $commands = array();
+    $commands[] = ajax_command_replace(NULL, theme('status_messages'));
+    return array('#type' => 'ajax', '#commands' => $commands);
+  }
+
+  // Retrieve the hs element and its parents.
+  $hs_element = $form; $hs_element_parents = array();
+  foreach ($form_parents as $parent) {
+    $hs_element = $hs_element[$parent]; $hs_element_parents[] = $parent;
+  }
+  $hs_element_input = drupal_array_get_nested_value($form_state['input'], $hs_element_parents);
+  $hsid = $hs_element_input['hsid'];
+
+  // when creating new item
+  if ($form_state['input']['op'] == t('Create')) {
+
+    // stop when input is empty or the default
+    $term_input = $hs_element_input['hierarchical_select']['create_new_item']['input'];
+    if ($term_input == '' || $term_input == t('new item')) {
+      // Throw error.
+      drupal_set_message(t('Please provide a valid item.'), 'error');
+      $commands = array();
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'addClass', array('error'));
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'focus');
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'remove');
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper', 'prepend', array(theme('status_messages')));
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(400, 0.25));
+      $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(1200, 1));
+      return array('#type' => 'ajax', '#commands' => $commands);
+    }
+    // prevent duplicates
+    $level = count($hs_element_input['hierarchical_select']['selects']);
+    $selected_parent_tid = $hs_element_input['hierarchical_select']['selects'][$level-1];
+    $hs_element_vid = $hs_element['#config']['params']['vid'];
+    $duplicate_terms = taxonomy_get_term_by_name($term_input);
+    foreach ($duplicate_terms as $duplicate_term) {
+      // if $duplicate_term is in the same vocabulary as the hs vocabulary
+      if ($duplicate_term->vid == $hs_element_vid) {
+        if ($level == 0) {
+          $root_level_terms = taxonomy_get_tree($hs_element_vid, 0, $level+1);
+          foreach ($root_level_terms as $root_level_term) {
+            if( strtolower($duplicate_term->name) == strtolower($root_level_term->name)) {
+              // Throw error.
+              drupal_set_message(t('Item already exists.'), 'error');
+              $commands = array();
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'addClass', array('error'));
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'focus');
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'remove');
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper', 'prepend', array(theme('status_messages')));
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(400, 0.25));
+              $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(1200, 1));
+              return array('#type' => 'ajax', '#commands' => $commands);
+            }
+          }
+        }
+        // if $duplicate_term is already a child of the selected parent
+        if (in_array($duplicate_term, taxonomy_get_children($selected_parent_tid, $hs_element_vid))) {
+          // Throw error.
+          drupal_set_message(t('Item already exists.'), 'error');
+          $commands = array();
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'addClass', array('error'));
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'focus');
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'remove');
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper', 'prepend', array(theme('status_messages')));
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(400, 0.25));
+          $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(1200, 1));
+          return array('#type' => 'ajax', '#commands' => $commands);
+        }
+      }
+    }
+
+    // mollom integration
+    if (isset($form_state['input']['mollom']['captcha2'])) {
+
+      $original_values_mollom_captcha = $form_state['values']['mollom']['captcha'];
+      $form_state['values']['mollom']['captcha'] = $form_state['input']['mollom']['captcha2'];
+
+      $original_session_id = $form_state['mollom']['response']['session_id'];
+      $form_state['mollom']['response']['session_id'] = $form_state['input']['mollom']['session_id2'];
+
+      $original_captcha_success = $form_state['mollom']['passed_captcha'];
+      $form_state['mollom']['passed_captcha'] = FALSE;
+      
+      mollom_validate_captcha($form, $form_state);
+      // restore originals
+      $form_state['values']['mollom']['captcha'] = $original_values_mollom_captcha;
+      $form_state['mollom']['response']['session_id'] = $original_session_id;
+
+      // if captcha failed generate new one and stop
+      if (!$form_state['mollom']['passed_captcha']) {
+        // restore original captcha success status
+        $form_state['mollom']['passed_captcha'] = $original_captcha_success;
+        
+        $commands = array();
+
+        // generate new captcha
+        $captcha_image = mollom_get_captcha('image');
+        $captcha_html = '<input class="mollom-session-id" type="hidden" name="mollom[session_id2]" value="'.$captcha_image['response']['session_id'].'">'
+        .'<div class="form-item form-type-textfield form-item-mollom-captcha">'
+        .'<label for="edit-mollom-captcha2">Word verification <span class="form-required" title="This field is required.">*</span></label>'
+        .'<span class="field-prefix">'
+        .$captcha_image['markup']
+        .'</span>'
+        .'<input autocomplete="off" type="text" id="edit-mollom-captcha2" name="mollom[captcha2]" value="" size="10" maxlength="128" class="form-text required">'
+        .'</div>';
+        
+        // replace old captcha
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper input.mollom-session-id', 'remove');
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.form-item-mollom-captcha', 'remove');
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'after', array($captcha_html));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper .create-new-item-input', 'removeClass', array('error'));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'remove');
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper', 'prepend', array(theme('status_messages')));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(400, 0.25));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper div.messages', 'fadeTo', array(1200, 1));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper #edit-mollom-captcha2', 'addClass', array('error'));
+        $commands[] = ajax_command_invoke('#hierarchical-select-'.$hsid.'-wrapper #edit-mollom-captcha2', 'focus');
+        
+        return array('#type' => 'ajax', '#commands' => $commands);
+      }
+      // restore original captcha success status
+      $form_state['mollom']['passed_captcha'] = $original_captcha_success;
+    }
+    // Make user input lowercase with first letter capitalised
+    // TODO: This shoud be a site admin option
+    $term_input = ucfirst(strtolower($term_input));
+    drupal_array_set_nested_value($form_state['input'], array_merge($hs_element_parents, array('hierarchical_select','create_new_item','input')), $term_input);
+  }
+
+  // Process user input. $form and $form_state are modified in the process.
+  drupal_process_form($form['#form_id'], $form, $form_state);
+
+  // retrieve new hsid after processing
+  $new_hsid = drupal_array_get_nested_value($form, $hs_element_parents);
+  $new_hsid = $new_hsid['hsid']['#value'];
+  
+  // Retrieve the element to be rendered.
+  foreach ($form_parents as $parent) {
+    $form = $form[$parent];
+  }
+  
+  // If the user's browser supports the active cache system, then send the
+  // currently requested hierarchy in an easy-to-manage form.
+  $cache = array();
+  if (isset($_POST['client_supports_caching'])) {
+    if ($_POST['client_supports_caching'] == 'true') {
+      $cache = _hierarchical_select_json_convert_hierarchy_to_cache($form['hierarchy']['#value']);
+    }
+    else if ($_POST['client_supports_caching'] == 'false') {
+      // This indicates that a client-side cache is installed, but not working
+      // properly.
+      // TODO: figure out a clean way to notify the administrator.
+    }
+  }
+
+  // clear messages during ajax operations
+  drupal_get_messages();
+  
+  $rendered_hs = drupal_render($form);
+
+  // if "create new item" selected, and form is protected by mollom
+  $create_new_item_selected = isset($form['hierarchical_select']['create_new_item']);
+  if ($create_new_item_selected && isset($form_state['mollom'])) {
+    // generate new captcha image
+    $captcha_image = mollom_get_captcha('image');
+    $captcha_html = '<input class="mollom-session-id" type="hidden" name="mollom[session_id2]" value="'.$captcha_image['response']['session_id'].'">'
+    .'<div class="form-item form-type-textfield form-item-mollom-captcha">'
+    .'<label for="edit-mollom-captcha2">Word verification <span class="form-required" title="This field is required.">*</span></label>'
+    .'<span class="field-prefix">'
+    .$captcha_image['markup']
+    .'</span>'
+    .'<input autocomplete="off" type="text" id="edit-mollom-captcha2" name="mollom[captcha2]" value="" size="10" maxlength="128" class="form-text required">'
+    .'</div>';
+    
+    // display captcha in "create new item" box via ajax
+    $arr = explode('<input class="create-new-item-create form-submit"', $rendered_hs);
+    $rendered_hs = $arr[0].$captcha_html.'<input class="create-new-item-create form-submit"'.$arr[1];
+  }
+
+  // Render the output.
+  $output = $rendered_hs;
+
+  // Send AJAX command to update the Hierarchical Select.
+  $commands = array();
+  $commands[] = array(
+      'command' => 'hierarchicalSelectUpdate', 
+      'output'  => $output, 
+      // 'cache'   => $cache,
+  );
+  $new_settings = _hs_new_setting_ajax(FALSE);
+  foreach ($new_settings as $new_setting) {
+    $commands[] = array(
+      'command'  => 'hierarchicalSelectSettingsUpdate',
+      'hsid'     => $new_setting['hsid'],
+      'settings' => $new_setting['settings'],
+    );
+  }
+
+  // Remove error formatting
+  $commands[] = ajax_command_invoke('#hierarchical-select-'.$new_hsid.'-wrapper .error', 'removeClass', array('error'));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Implements hook_node_validate().
+ */
+// Prevent node submit in hierarchical_select ajax operations. See: http://drupal.org/node/1293166
+function solve_hs_issues_node_validate($node, $form, &$form_state) {
+  if (arg(0) == 'hierarchical_select_ajax') {
+    form_set_error('');
+  }
+}

@@ -1,0 +1,51 @@
+/* Add Custom Style Information Here */
+/* Georgia College & State University */
+/* Modified by Mark Misinco */
+
+
+
+/* Remove the list style and add padding to the footer*/
+.region-four-first ul {
+    list-style-type: none;
+}
+.region-four-first .item-list {
+    margin-left: -13px;
+}
+
+.region-four-first .item-list .even{
+padding-bottom: 5px;
+}
+
+
+.region-four-first .item-list .odd{
+padding-bottom: 5px;
+}
+
+.region-four-second ul {
+    list-style-type: none;
+}
+.region-four-second .item-list {
+    margin-left: -13px;
+}
+
+.region-four-second .item-list .even{
+padding-bottom: 5px;
+}
+
+
+.region-four-second .item-list .odd{
+padding-bottom: 5px;
+}
+/*
+ *Added to combat problem where jQuery Chosen does not work for select lists that are hidden on page load (conditional fields)
+ */
+.chzn-container{
+width: 250px !important;
+}
+
+.chzn-drop{
+width: 248px !important;
+}
+.chzn-search{
+width: 198px !important;
+}

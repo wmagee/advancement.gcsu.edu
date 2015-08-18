@@ -1,0 +1,6 @@
+name = Custom Validator
+description = Validates cck fields for Advancement Services forms
+core = 7.x
+package = Advancement Services
+
+

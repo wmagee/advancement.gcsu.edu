@@ -1,0 +1,14 @@
+Index: conditional_fields.module
+===================================================================
+--- conditional_fields.module	(revision 4017)
++++ conditional_fields.module	(working copy)
+@@ -871,6 +871,8 @@
+       // Compare arrays recursively ignoring keys, since multiple select widgets
+       // values have numeric keys in form format and string keys in storage
+       // format.
++      if (!is_array($dependency_values))
++      	$dependency_values = array($dependency_values);
+       return array_values($dependency_values) == array_values($values);
+     }
+ 
+

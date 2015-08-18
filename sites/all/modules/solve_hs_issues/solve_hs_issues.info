@@ -1,0 +1,8 @@
+name = Solve hierarchical_select issues
+description = Enhances hierarchical_select module and fixes some issues
+dependencies[] = hierarchical_select
+
+files[] = solve_hs_issues.module
+
+version = "7.x-1.0"
+core = "7.x"

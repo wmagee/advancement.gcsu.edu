@@ -1,0 +1,174 @@
+<?php
+function custom_validator_validate_field_amount($variables) {
+	$flag = true;
+	
+	//$str = "<pre>".print_r($variables, true).'</pre>';
+	//drupal_set_message($str, 'status', false);
+	
+	$other_income = $variables['entity']->field_other_income['und'][0]['value'];
+	//$other_income = field_get_items('field_collection_item', $variables['entity'], 'field_other_income');
+	$donation = $variables['entity']->field_donation['und'][0]['value'];
+	$name = $variables['entity']->field_deposit_name['und'][0]['value'];
+	$amount = $variables['item']['value'];
+	
+	
+	if($amount == ($other_income + $donation)){
+		$flag = true;
+	} else {
+		$flag = false;
+		$str = "Problem with line where Name: ".$name.", Other Income: ".$other_income.", Donation: ".$donation.", Amount: ".$amount;
+		drupal_set_message($str, 'error', false);
+	}
+	
+	return $flag;
+}
+/*
+Array
+(
+    [value] => 20.00
+    [item] => Array
+        (
+            [value] => 20.00
+        )
+
+    [delta] => 0
+    [items] => Array
+        (
+            [0] => Array
+                (
+                    [value] => 20.00
+                )
+
+        )
+
+    [validator_name] => custom
+    [langcode] => und
+    [entity] => FieldCollectionItemEntity Object
+        (
+            [fieldInfo:protected] => 
+            [hostEntity:protected] => 
+            [hostEntityId:protected] => 
+            [hostEntityType:protected] => 
+            [langcode:protected] => 
+            [item_id] => 31
+            [field_name] => field_deposit_item
+
+            [field_amount] => Array
+                (
+                    [und] => Array
+                        (
+                            [0] => Array
+                                (
+                                    [value] => 20.00
+                                )
+
+                        )
+
+                )
+
+
+            [field_other_income] => Array
+                (
+                    [und] => Array
+                        (
+                            [0] => Array
+                                (
+                                    [value] => 10.00
+                                )
+
+                        )
+
+                )
+
+            [field_donation] => Array
+                (
+                    [und] => Array
+                        (
+                            [0] => Array
+                                (
+                                    [value] => 10.00
+                                )
+
+                        )
+
+                )
+
+        )
+
+)
+*/
+
+/*
+ *This function checks to make sure 'Account Number & Name' (field_account) and 'Payable to'(payable to)
+ *are not left empty
+ *Using the same function for both fields because A) less code, and B) it didn't work when I used two separate functions
+ *This code is called by the validation rule that is set on the 'Account Number & Name' field
+ *(Edit content type > Payment Request > Manage Fields > Validate)
+ */
+function custom_validator_validate_field_account($variables) {
+	$flag = true;
+	
+	//is this an alumni or foundation request? Get the 'Requesting payment from' field value
+	$alum_or_fdtn = $variables['entity']->field_alum_or_fdtn['und'][0]['value'];
+	
+	//if it's set, get the 'Payable to' field value
+	if(isset($variables['entity']->field_payable_to['und'][0]['tid'])){
+		$payable_to = $variables['entity']->field_payable_to['und'][0]['tid'];
+	}else{
+		$payable_to = NULL;
+	}
+	//if it's set, get the 'Account Number & Name' field value
+	$account = $variables['item']['tid'];
+	
+	if($alum_or_fdtn =='A'){ //if this is an alumni request
+		if(empty($account)){ //if the 'Account Number & Name' field is empty
+			$flag = false;
+			drupal_set_message("The 'Account Number & Name' field cannot be blank", 'error', false);
+		}
+		if(empty($payable_to)){ // if the alumni 'Payable to' field is empty
+			$flag = false;
+			drupal_set_message("The 'Payable to' field cannot be blank", 'error', false);
+		}
+	} else {
+		$flag = true;
+	}
+	
+	return $flag;
+}
+
+/*
+ *This function checks to make sure 'Fund Number & Name'(field_fund) and 'Payable to'(payable_to_fdtn)
+ *are not left empty
+ *Using the same function for both fields because A) less code, and B) it didn't work when I used two separate functions
+ *This code is called by the validation rule that is set on the 'Fund Number & Name' (field_fund) field
+ *(Edit content type > Payment Request > Manage Fields > Validate)
+ */
+function custom_validator_validate_field_fund($variables) {
+	$flag = true;
+	//is this an alumni or foundation request? Get the 'Requesting payment from' field value
+	$alum_or_fdtn = $variables['entity']->field_alum_or_fdtn['und'][0]['value'];
+	
+	//if it's set, get the 'Payable to' field value
+	if(isset($variables['entity']->field_payable_to_fdtn['und'][0]['tid'])){
+		$payable_to = $variables['entity']->field_payable_to_fdtn['und'][0]['tid'];
+	}else{
+		$payable_to = NULL;
+	}
+	//if it's set, get the 'Fund Number & Name' field value
+	$fund = $variables['item']['tid'];
+	
+	if($alum_or_fdtn =='F'){
+		if(empty($fund)){ //if the 'Fund Number & Name' field is empty
+			$flag = false;
+			drupal_set_message("The 'Fund Number & Name' field cannot be blank", 'error', false);
+		}
+		if(empty($payable_to)){ // if the foundation 'Payable to' field is empty
+			$flag = false;
+			drupal_set_message("The 'Payable to' field cannot be blank", 'error', false);
+		}
+	} else {
+		$flag = true;
+	}
+	
+	return $flag;
+}

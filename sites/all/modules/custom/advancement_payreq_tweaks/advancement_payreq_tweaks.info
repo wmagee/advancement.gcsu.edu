@@ -1,0 +1,4 @@
+name = Advancement Payment Request Form Tweaks
+description = Disables fields after approval; Prepopulates fields when request has to be re-submitted
+package = Advancement Services
+core = 7.x

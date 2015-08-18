@@ -1,0 +1,121 @@
+<?php
+/**
+* Implementation of hook_menu()
+* Associates /resubmit-payreq with resubmit_payreq()
+*/
+function advancement_payreq_tweaks_menu() {
+	$items['resubmit-payreq'] = array( 	
+		'title' => 'Resubmit Payment Request',
+		'page callback' => 'resubmit_payreq',
+		'access arguments' => array('access content'),
+    );
+
+    return $items;
+}
+
+/**
+* This function copies the existing payment request and empties all approval/decline fields
+* Used to resubmit a payment request after it has been declined
+*/
+function resubmit_payreq() {
+	$nid = arg(1);
+	$new_node = new StdClass();
+	$old_node = node_load($nid);
+	$new_node = $old_node;
+	//$str = "<pre>".print_r($old_node, true)."</pre>";
+	//drupal_set_message('BEFORE: '.$str, 'status', true);	
+	
+	//unset fields and resave it as a new node
+	//node info
+	$new_node->nid = null;
+	unset($new_node->vid);
+	//unset($new_node->created);
+	//unset($new_node->changed);
+	//unset($new_node->revision_timestamp);
+	//unset($new_node->revision_uid);
+	//unset($new_node->rdf_mapping);
+	
+	//declined
+	unset($new_node->field_declined);
+	unset($new_node->field_payreq_status);
+	
+	//approval fields
+	unset($new_node->field_appr_dept_head);
+	unset($new_node->field_appr_date_dept);
+	
+	unset($new_node->field_adv_rep);
+	unset($new_node->field_appr_adv);
+	unset($new_node->field_appr_date_adv);
+	
+	unset($new_node->field_treasurer);
+	unset($new_node->field_appr_treasurer);
+	unset($new_node->field_appr_date_treas);
+	
+	unset($new_node->field_as_director);
+	unset($new_node->field_appr_director);
+	unset($new_node->field_appr_date_director);
+	
+	unset($new_node->field_vp);
+	unset($new_node->field_appr_vp);
+	unset($new_node->field_appr_date_vp);
+
+	global $user;
+	$new_node->log = "Resubmitted ".date('m/j/Y H:i:s').' by '.$user->name;
+	$new_node->field_log['und'][0]['value'] = "This form was previously declined. It was resubmitted on "
+										.date('m/j/Y H:i:s').' by '.$user->name.
+										". The ID of the previously declined form is: ".$nid;
+	
+	//$str = "<pre>".print_r($new_node, true)."</pre>";
+	//drupal_set_message('AFTER: '.$str, 'status', true);
+	$new_node = node_submit($new_node);
+	if ($new_node->validated) {
+		node_save($new_node);
+	}
+
+	drupal_goto("node/".$new_node->nid."/edit");
+
+}
+/*
+* implementation of hook_form_alter
+* Handles the hiding of certain field groups based on where the request is in the approval process
+* 
+*/
+function advancement_payreq_tweaks_form_payment_request_node_form_alter(&$form, &$form_state, $form_id) {
+    
+	//$str = "<pre>".print_r($form['nid'], true)."</pre>";
+	//drupal_set_message($str, 'status', true);
+    //global $user; //currently logged in user
+		
+		//if form is declined, hide approvals group
+		if(isset($form['field_declined']['und'][0]['value']['#default_value'])) {
+			field_group_hide_field_groups($form, array('group_payreq_approval','group_dept_approval','group_treas_approval',
+			'group_director','group_adv_approval','group_accountant','group_adv_vp'));
+			drupal_set_message("This Payment Request can no longer be approved because it has been declined.", 'error', true);
+		}
+		
+		//if form is being approved by someone other than Treasurer, Accountant, Director, or Admin, hide payreq info and treasurer field groups
+	/*	if (!in_array('Accountant', $user->roles)||!in_array('Treasurer', $user->roles)||
+			!in_array('AS Director', $user->roles)||!in_array('Advancement Admin', $user->roles)||
+			!in_array('drupal_admin', $user->roles)) {
+			//drupal_set_message("Shouldn't see payreq info", 'error', true);
+			//field_group_hide_field_groups($form, array('group_payreq_info'));
+		}
+	*/
+}
+/*implementation of hook_form_alter
+ *if an argument is passed in the url, prepopulate the payment request reference field of the payment request discrepancy form
+ *
+ */
+function advancement_payreq_tweaks_form_payment_request_discrepancy_form_node_form_alter(&$form, &$form_state, $form_id) {
+	//drupal_set_message("FORM ID: $form_id");
+	//$str = '<pre>'.print_r($arg, TRUE).'</pre>';
+    //drupal_set_message($str);
+       $nid = arg(3);
+        if($nid) {
+              //$str = '<pre>'.print_r($form['field_payment_request_reference'], TRUE).'</pre>';
+              //drupal_set_message($str);
+              $form['field_payment_request_reference']['und'][0]['nid']['#default_value'] = $nid;
+              
+        }
+
+}
